@@ -1,0 +1,6 @@
+{
+  "preamble_length": 128,
+  "sts_enabled": false,
+  "tx_antenna_delay": 16385,
+  "rx_antenna_delay": 16385
+}

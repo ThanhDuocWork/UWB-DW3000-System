@@ -1,0 +1,19 @@
+menu "UWB App Configuration"
+
+choice UWB_NODE_ROLE
+    prompt "Default node role"
+    default UWB_ROLE_TAG
+
+config UWB_ROLE_TAG
+    bool "Tag"
+
+config UWB_ROLE_ANCHOR
+    bool "Anchor"
+endchoice
+
+config UWB_NODE_ID
+    int "Node ID"
+    range 1 255
+    default 1
+
+endmenu

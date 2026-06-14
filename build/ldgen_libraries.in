@@ -161,13 +161,13 @@ $<TARGET_FILE:idf::wifi_provisioning>
 $<TARGET_FILE:__idf_json>
 $<TARGET_FILE:idf::common>
 $<TARGET_FILE:idf::utils>
-$<TARGET_FILE:idf::platform_hal>
+$<TARGET_FILE:idf::board>
 $<TARGET_FILE:__idf_common>
 $<TARGET_FILE:__idf_utils>
-$<TARGET_FILE:idf::board>
+$<TARGET_FILE:idf::platform_hal>
+$<TARGET_FILE:__idf_board>
 $<TARGET_FILE:idf::dw3000>
 $<TARGET_FILE:__idf_platform_hal>
-$<TARGET_FILE:__idf_board>
 $<TARGET_FILE:idf::uwb>
 $<TARGET_FILE:__idf_dw3000>
 $<TARGET_FILE:idf::ranging>

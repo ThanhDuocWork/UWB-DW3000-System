@@ -3,7 +3,7 @@ idf_component_register(
         "src/board.cpp"
         "src/board_config.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES common
+    REQUIRES common utils
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)

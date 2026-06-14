@@ -1,0 +1,31 @@
+# ESP-IDF build output
+/build/
+/sdkconfig
+/sdkconfig.old
+/sdkconfig.*.old
+
+# CMake / compilation database
+compile_commands.json
+CMakeUserPresets.json
+
+# IDE / editor
+.vscode/
+.idea/
+*.code-workspace
+
+# OS / misc
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Logs / temporary files
+*.log
+*.tmp
+*.temp
+
+# Test / local artifacts
+/testing/

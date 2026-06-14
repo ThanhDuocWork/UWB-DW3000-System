@@ -574,12 +574,12 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("D:/00.LabESP32/06.ESP32_UWB_DW3000/UWB-DW3000-System/build/esp-idf/platform_hal/cmake_install.cmake")
+  include("D:/00.LabESP32/06.ESP32_UWB_DW3000/UWB-DW3000-System/build/esp-idf/board/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("D:/00.LabESP32/06.ESP32_UWB_DW3000/UWB-DW3000-System/build/esp-idf/board/cmake_install.cmake")
+  include("D:/00.LabESP32/06.ESP32_UWB_DW3000/UWB-DW3000-System/build/esp-idf/platform_hal/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)

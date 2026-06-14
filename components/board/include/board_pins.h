@@ -1,17 +1,16 @@
 #pragma once
 
-namespace board {
+// DW3000 SPI
+#define BOARD_UWB_SPI_SCLK_GPIO      18
+#define BOARD_UWB_SPI_MISO_GPIO      19
+#define BOARD_UWB_SPI_MOSI_GPIO      23
+#define BOARD_UWB_SPI_CS_GPIO        4
 
-struct Pins {
-    int spi_sck = 18;
-    int spi_mosi = 23;
-    int spi_miso = 19;
-    int uwb_cs = 4;
-    int uwb_rst = 27;
-    int uwb_irq = 34;
-    int status_led = 2;
-};
+// DW3000 control
+#define BOARD_UWB_IRQ_GPIO           34  // input-only on ESP32
+#define BOARD_UWB_RST_GPIO           27
+#define BOARD_UWB_WAKEUP_GPIO        32
+#define BOARD_UWB_EXTON_GPIO         33
 
-const Pins &pins();
-
-}  // namespace board
+// Optional board peripherals
+#define BOARD_STATUS_LED_GPIO        2

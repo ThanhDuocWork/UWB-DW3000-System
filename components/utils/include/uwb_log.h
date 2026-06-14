@@ -20,8 +20,8 @@ uint32_t uwb_log_get_tag_flags(const char *tag);
 bool uwb_log_enable_tag_flags(const char *tag, uint32_t flags);
 bool uwb_log_disable_tag_flags(const char *tag, uint32_t flags);
 bool uwb_log_is_enabled(uwb_log_level_t level, const char *tag, uint32_t flag);
-void uwb_log_write(uwb_log_level_t level, uint32_t flag, const char *tag, const char *fmt, ...);
-void uwb_log_vwrite(uwb_log_level_t level, uint32_t flag, const char *tag, const char *fmt, va_list args);
+void uwb_log_write(uwb_log_level_t level, uint32_t flag, const char *tag, const char *file, int line, const char *fmt, ...);
+void uwb_log_vwrite(uwb_log_level_t level, uint32_t flag, const char *tag, const char *file, int line, const char *fmt, va_list args);
 
 #ifdef __cplusplus
 }
@@ -31,10 +31,10 @@ void uwb_log_vwrite(uwb_log_level_t level, uint32_t flag, const char *tag, const
 #define UWB_LOG_TAG "UWB"
 #endif
 
-#define UWB_LOGE(tag, fmt, ...)       uwb_log_write(UWB_LOG_LEVEL_ERROR, 0U, tag, fmt, ##__VA_ARGS__)
-#define UWB_LOGW(tag, flag, fmt, ...) uwb_log_write(UWB_LOG_LEVEL_WARN,  (uint32_t)(flag), tag, fmt, ##__VA_ARGS__)
-#define UWB_LOGI(tag, flag, fmt, ...) uwb_log_write(UWB_LOG_LEVEL_INFO,  (uint32_t)(flag), tag, fmt, ##__VA_ARGS__)
-#define UWB_LOGD(tag, flag, fmt, ...) uwb_log_write(UWB_LOG_LEVEL_DEBUG, (uint32_t)(flag), tag, fmt, ##__VA_ARGS__)
+#define UWB_LOGE(tag, fmt, ...)       uwb_log_write(UWB_LOG_LEVEL_ERROR, 0U, tag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define UWB_LOGW(tag, flag, fmt, ...) uwb_log_write(UWB_LOG_LEVEL_WARN,  (uint32_t)(flag), tag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define UWB_LOGI(tag, flag, fmt, ...) uwb_log_write(UWB_LOG_LEVEL_INFO,  (uint32_t)(flag), tag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define UWB_LOGD(tag, flag, fmt, ...) uwb_log_write(UWB_LOG_LEVEL_DEBUG, (uint32_t)(flag), tag, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #define LOG_E(fmt, ...)             UWB_LOGE(UWB_LOG_TAG, fmt, ##__VA_ARGS__)
 #define LOG_W(flag, fmt, ...)       UWB_LOGW(UWB_LOG_TAG, flag, fmt, ##__VA_ARGS__)

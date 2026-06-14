@@ -1,16 +1,19 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include "base_spi.h"
 
 namespace hal::spi {
 
-enum LogFlag : unsigned int {
-    LOG_FLAG_INIT = 1U << 0,
-    LOG_FLAG_WRITE_READ = 1U << 1,
-};
+using LogFlag = base::spi::LogFlag;
 
-bool init();
-bool write_read(const uint8_t *tx_data, uint8_t *rx_data, size_t size);
+inline bool init_spi()
+{
+    return base::spi::init_spi();
+}
+
+inline bool transfer(const uint8_t *tx_data, uint8_t *rx_data, size_t size)
+{
+    return base::spi::transfer(tx_data, rx_data, size);
+}
 
 }  // namespace hal::spi

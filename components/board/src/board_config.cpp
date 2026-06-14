@@ -1,15 +1,8 @@
 #include "board_config.h"
-#include "board_pins.h"
 
 #include "sdkconfig.h"
 
 namespace board {
-
-const Pins &pins()
-{
-    static const Pins kPins{};
-    return kPins;
-}
 
 const BoardConfig &config()
 {

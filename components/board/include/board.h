@@ -10,5 +10,6 @@ enum LogFlag : unsigned int {
 };
 
 void init();
+void init_board_uwb();
 
 }  // namespace board

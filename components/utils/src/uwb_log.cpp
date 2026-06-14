@@ -33,6 +33,27 @@ const char *level_to_text(uwb_log_level_t level)
     }
 }
 
+const char *basename_from_path(const char *path)
+{
+    if (path == nullptr || path[0] == '\0') {
+        return "unknown";
+    }
+
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+    const char *base = path;
+
+    if (slash != nullptr && backslash != nullptr) {
+        base = (slash > backslash) ? (slash + 1) : (backslash + 1);
+    } else if (slash != nullptr) {
+        base = slash + 1;
+    } else if (backslash != nullptr) {
+        base = backslash + 1;
+    }
+
+    return base;
+}
+
 uwb_log_tag_entry_t *find_tag_entry(const char *tag)
 {
     if (tag == nullptr || tag[0] == '\0') {
@@ -126,25 +147,26 @@ extern "C" bool uwb_log_is_enabled(uwb_log_level_t level, const char *tag, uint3
     return (uwb_log_get_tag_flags(tag) & flag) != 0U;
 }
 
-extern "C" void uwb_log_vwrite(uwb_log_level_t level, uint32_t flag, const char *tag, const char *fmt, va_list args)
+extern "C" void uwb_log_vwrite(uwb_log_level_t level, uint32_t flag, const char *tag, const char *file, int line, const char *fmt, va_list args)
 {
     const unsigned long long timestamp_ms = (unsigned long long)(esp_timer_get_time() / 1000ULL);
     const char *safe_tag = (tag != nullptr && tag[0] != '\0') ? tag : "UWB";
+    const char *safe_file = basename_from_path(file);
 
     if (!uwb_log_is_enabled(level, safe_tag, flag)) {
         return;
     }
 
-    printf("[%10llu][%s][%s] ", timestamp_ms, level_to_text(level), safe_tag);
+    printf("[%s:%d][%10llu][%s][%s] ", safe_file, line, timestamp_ms, level_to_text(level), safe_tag);
     vprintf(fmt, args);
     printf("\n");
 }
 
-extern "C" void uwb_log_write(uwb_log_level_t level, uint32_t flag, const char *tag, const char *fmt, ...)
+extern "C" void uwb_log_write(uwb_log_level_t level, uint32_t flag, const char *tag, const char *file, int line, const char *fmt, ...)
 {
     va_list args;
 
     va_start(args, fmt);
-    uwb_log_vwrite(level, flag, tag, fmt, args);
+    uwb_log_vwrite(level, flag, tag, file, line, fmt, args);
     va_end(args);
 }

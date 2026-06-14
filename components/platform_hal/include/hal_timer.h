@@ -1,10 +1,17 @@
 #pragma once
 
-#include <stdint.h>
+#include "base_timer.h"
 
 namespace hal::timer {
 
-uint64_t now_us();
-void delay_ms(uint32_t delay_ms);
+inline uint64_t now_us()
+{
+    return base::timer::now_us();
+}
+
+inline void delay_ms(uint32_t delay_ms)
+{
+    base::timer::delay_ms(delay_ms);
+}
 
 }  // namespace hal::timer

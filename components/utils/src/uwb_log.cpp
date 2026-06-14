@@ -157,7 +157,7 @@ extern "C" void uwb_log_vwrite(uwb_log_level_t level, uint32_t flag, const char 
         return;
     }
 
-    printf("[%s:%d][%10llu][%s][%s] ", safe_file, line, timestamp_ms, level_to_text(level), safe_tag);
+    printf("[%s:%d][%llu][%s][%s] ", safe_file, line, timestamp_ms, level_to_text(level), safe_tag);
     vprintf(fmt, args);
     printf("\n");
 }

@@ -7,7 +7,7 @@ idf_component_register(
         "src/esp_idf_storage.cpp"
         "src/esp_idf_log.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES board common utils driver nvs_flash esp_timer
+    REQUIRES board utils nvs_flash esp_timer esp_driver_gpio esp_driver_spi freertos
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)

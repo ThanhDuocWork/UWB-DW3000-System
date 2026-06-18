@@ -5,7 +5,7 @@ idf_component_register(
         "src/uwb_mac.cpp"
         "src/uwb_events.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES common dw3000
+    REQUIRES dw3000 utils
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)

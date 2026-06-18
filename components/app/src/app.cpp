@@ -32,9 +32,15 @@ static void enable_bringup_logs()
                           dw3000_hal::LOG_FLAG_RESET |
                           dw3000_hal::LOG_FLAG_SPI_READ |
                           dw3000_hal::LOG_FLAG_SPI_WRITE);
-    UWB_LOG_SET_FLAGS("dw3000", dw3000::LOG_FLAG_INIT | dw3000::LOG_FLAG_REG);
+    UWB_LOG_SET_FLAGS("dw3000",
+                      dw3000::LOG_FLAG_INIT |
+                          dw3000::LOG_FLAG_REG |
+                          dw3000::LOG_FLAG_TX |
+                          dw3000::LOG_FLAG_RX);
     UWB_LOG_SET_FLAGS("uwb", uwb::LOG_FLAG_STARTUP);
     UWB_LOG_SET_FLAGS("ranging", ranging::LOG_FLAG_INIT);
+    UWB_LOG_SET_FLAGS("anchor_role", roles::anchor::LOG_FLAG_RUN);
+    UWB_LOG_SET_FLAGS("tag_role", roles::tag::LOG_FLAG_RUN);
 }
 
 void start()

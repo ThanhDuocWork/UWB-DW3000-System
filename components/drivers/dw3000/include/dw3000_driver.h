@@ -19,11 +19,14 @@ enum LogFlag : unsigned int {
 
 bool init(const Config &config);
 DeviceInfo get_device_info();
-bool read_reg(uint16_t reg, uint16_t subaddr, uint8_t *data, size_t size);
-bool write_reg(uint16_t reg, uint16_t subaddr, const uint8_t *data, size_t size);
-bool read_reg_u32(uint16_t reg, uint16_t subaddr, uint32_t *value);
+bool read_reg(uint32_t reg, uint16_t offset, uint8_t *data, size_t size);
+bool write_reg(uint32_t reg, uint16_t offset, const uint8_t *data, size_t size);
+bool read_reg_u32(uint32_t reg, uint16_t offset, uint32_t *value);
+bool write_reg_u32(uint32_t reg, uint16_t offset, uint32_t value);
+bool issue_command(uint32_t command);
 uint32_t read_device_id();
 bool transmit(const uint8_t *data, size_t size);
 bool start_receive();
+bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeout_ms);
 
 }  // namespace dw3000

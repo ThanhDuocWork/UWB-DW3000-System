@@ -8,7 +8,7 @@ idf_component_register(
         "src/dw3000_irq.cpp"
         "src/dw3000_diag.cpp"
     INCLUDE_DIRS "include" "vendor"
-    REQUIRES platform_hal board common
+    REQUIRES platform_hal board utils
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)

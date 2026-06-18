@@ -4,8 +4,7 @@ idf_component_register(
         "src/app_context.cpp"
         "src/app_config.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES roles board platform_hal ranging uwb dw3000 common utils
+    REQUIRES roles board platform_hal ranging uwb dw3000 utils
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)
-

@@ -16,39 +16,42 @@ static DeviceInfo s_info{};
 
 namespace {
 
-constexpr size_t kMaxHeaderSize = 3U;
-constexpr uint8_t kRegIdMask = 0x3FU;
-constexpr uint8_t kWriteFlag = 0x80U;
-constexpr uint8_t kSubAddrFlag = 0x40U;
-constexpr uint8_t kExtSubAddrFlag = 0x80U;
+constexpr size_t kMaxHeaderSize = 2U;
+constexpr uint16_t kSpiWriteBit = 0x8000U;
+constexpr uint16_t kSpiReadBit = 0x0000U;
+constexpr uint8_t kSpiFastAccessCommand = 0x01U;
+constexpr uint8_t kSpiFastAccessReadWrite = 0x00U;
+constexpr uint8_t kSpiExtendedAddressReadWrite = 0x40U;
 constexpr uint32_t kInvalidDeviceIdAllZero = 0x00000000UL;
 constexpr uint32_t kInvalidDeviceIdAllOnes = 0xFFFFFFFFUL;
 constexpr int kDeviceIdReadRetries = 3;
 
-size_t build_header(bool is_write, uint16_t reg, uint16_t subaddr, uint8_t *header)
+size_t build_header(bool is_write, uint32_t reg, uint16_t offset, size_t data_len, uint8_t *header)
 {
-    if (header == nullptr || reg > kRegIdMask) {
+    if (header == nullptr) {
         return 0U;
     }
 
-    size_t header_len = 0U;
-    header[header_len] = static_cast<uint8_t>(reg & kRegIdMask);
-    if (is_write) {
-        header[header_len] |= kWriteFlag;
+    const uint16_t reg_file = static_cast<uint16_t>(0x1FU & ((reg + offset) >> 16U));
+    const uint16_t reg_offset = static_cast<uint16_t>(0x7FU & (reg + offset));
+    const uint16_t mode = is_write ? kSpiWriteBit : kSpiReadBit;
+    const uint16_t addr = static_cast<uint16_t>((reg_file << 9U) | (reg_offset << 2U));
+
+    if (is_write && data_len == 0U) {
+        header[0] = static_cast<uint8_t>((kSpiWriteBit >> 8U) | ((reg & 0x1FU) << 1U) | kSpiFastAccessCommand);
+        return 1U;
     }
 
-    if (subaddr != registers::NO_SUB_ADDRESS) {
-        header[header_len] |= kSubAddrFlag;
-        ++header_len;
-        header[header_len] = static_cast<uint8_t>(subaddr & 0x7FU);
-        if (subaddr > 0x7FU) {
-            header[header_len] |= kExtSubAddrFlag;
-            ++header_len;
-            header[header_len] = static_cast<uint8_t>((subaddr >> 7) & 0xFFU);
-        }
+    header[0] = static_cast<uint8_t>((mode | addr) >> 8U);
+    header[1] = static_cast<uint8_t>(addr | (mode & 0x03U));
+
+    if (reg_offset == 0U) {
+        header[0] |= kSpiFastAccessReadWrite;
+        return 1U;
     }
 
-    return header_len + 1U;
+    header[0] |= kSpiExtendedAddressReadWrite;
+    return 2U;
 }
 
 bool is_valid_device_id(uint32_t device_id)
@@ -58,19 +61,20 @@ bool is_valid_device_id(uint32_t device_id)
 
 }  // namespace
 
-bool read_reg(uint16_t reg, uint16_t subaddr, uint8_t *data, size_t size)
+bool read_reg(uint32_t reg, uint16_t offset, uint8_t *data, size_t size)
 {
     if (size > 0U && data == nullptr) {
-        UWB_LOGE(TAG, "DW3000 read_reg null buffer reg=0x%02x", static_cast<unsigned>(reg));
+        UWB_LOGE(TAG, "DW3000 read_reg null buffer reg=0x%06lx", static_cast<unsigned long>(reg));
         return false;
     }
 
     std::array<uint8_t, kMaxHeaderSize> header = {};
-    const size_t header_len = build_header(false, reg, subaddr, header.data());
+    const size_t header_len = build_header(false, reg, offset, size, header.data());
     if (header_len == 0U) {
-        UWB_LOGE(TAG, "DW3000 read_reg invalid header reg=0x%02x sub=0x%04x",
-                 static_cast<unsigned>(reg),
-                 static_cast<unsigned>(subaddr));
+        UWB_LOGE(TAG,
+                 "DW3000 read_reg invalid header reg=0x%06lx off=0x%04x",
+                 static_cast<unsigned long>(reg),
+                 static_cast<unsigned>(offset));
         return false;
     }
 
@@ -86,27 +90,29 @@ bool read_reg(uint16_t reg, uint16_t subaddr, uint8_t *data, size_t size)
         std::copy_n(rx.data() + header_len, size, data);
     }
 
-    UWB_LOGD(TAG, LOG_FLAG_REG,
-             "DW3000 read_reg reg=0x%02x sub=0x%04x len=%u",
-             static_cast<unsigned>(reg),
-             static_cast<unsigned>(subaddr),
+    UWB_LOGD(TAG,
+             LOG_FLAG_REG,
+             "DW3000 read_reg reg=0x%06lx off=0x%04x len=%u",
+             static_cast<unsigned long>(reg),
+             static_cast<unsigned>(offset),
              static_cast<unsigned>(size));
     return true;
 }
 
-bool write_reg(uint16_t reg, uint16_t subaddr, const uint8_t *data, size_t size)
+bool write_reg(uint32_t reg, uint16_t offset, const uint8_t *data, size_t size)
 {
     if (size > 0U && data == nullptr) {
-        UWB_LOGE(TAG, "DW3000 write_reg null buffer reg=0x%02x", static_cast<unsigned>(reg));
+        UWB_LOGE(TAG, "DW3000 write_reg null buffer reg=0x%06lx", static_cast<unsigned long>(reg));
         return false;
     }
 
     std::array<uint8_t, kMaxHeaderSize> header = {};
-    const size_t header_len = build_header(true, reg, subaddr, header.data());
+    const size_t header_len = build_header(true, reg, offset, size, header.data());
     if (header_len == 0U) {
-        UWB_LOGE(TAG, "DW3000 write_reg invalid header reg=0x%02x sub=0x%04x",
-                 static_cast<unsigned>(reg),
-                 static_cast<unsigned>(subaddr));
+        UWB_LOGE(TAG,
+                 "DW3000 write_reg invalid header reg=0x%06lx off=0x%04x",
+                 static_cast<unsigned long>(reg),
+                 static_cast<unsigned>(offset));
         return false;
     }
 
@@ -118,25 +124,26 @@ bool write_reg(uint16_t reg, uint16_t subaddr, const uint8_t *data, size_t size)
 
     const bool ok = dw3000_hal::spi_write(tx.data(), tx.size());
     if (ok) {
-        UWB_LOGD(TAG, LOG_FLAG_REG,
-                 "DW3000 write_reg reg=0x%02x sub=0x%04x len=%u",
-                 static_cast<unsigned>(reg),
-                 static_cast<unsigned>(subaddr),
+        UWB_LOGD(TAG,
+                 LOG_FLAG_REG,
+                 "DW3000 write_reg reg=0x%06lx off=0x%04x len=%u",
+                 static_cast<unsigned long>(reg),
+                 static_cast<unsigned>(offset),
                  static_cast<unsigned>(size));
     }
 
     return ok;
 }
 
-bool read_reg_u32(uint16_t reg, uint16_t subaddr, uint32_t *value)
+bool read_reg_u32(uint32_t reg, uint16_t offset, uint32_t *value)
 {
     if (value == nullptr) {
-        UWB_LOGE(TAG, "DW3000 read_reg_u32 null value reg=0x%02x", static_cast<unsigned>(reg));
+        UWB_LOGE(TAG, "DW3000 read_reg_u32 null value reg=0x%06lx", static_cast<unsigned long>(reg));
         return false;
     }
 
-    uint8_t raw[registers::DEV_ID_LEN] = {};
-    if (!read_reg(reg, subaddr, raw, sizeof(raw))) {
+    uint8_t raw[4] = {};
+    if (!read_reg(reg, offset, raw, sizeof(raw))) {
         return false;
     }
 
@@ -146,6 +153,26 @@ bool read_reg_u32(uint16_t reg, uint16_t subaddr, uint32_t *value)
         (static_cast<uint32_t>(raw[2]) << 16U) |
         (static_cast<uint32_t>(raw[3]) << 24U);
     return true;
+}
+
+bool write_reg_u32(uint32_t reg, uint16_t offset, uint32_t value)
+{
+    uint8_t raw[4] = {
+        static_cast<uint8_t>(value & 0xFFU),
+        static_cast<uint8_t>((value >> 8U) & 0xFFU),
+        static_cast<uint8_t>((value >> 16U) & 0xFFU),
+        static_cast<uint8_t>((value >> 24U) & 0xFFU),
+    };
+    return write_reg(reg, offset, raw, sizeof(raw));
+}
+
+bool issue_command(uint32_t command)
+{
+    const bool ok = write_reg(command, 0U, nullptr, 0U);
+    if (ok) {
+        UWB_LOGD(TAG, LOG_FLAG_REG, "DW3000 command=0x%02lx", static_cast<unsigned long>(command));
+    }
+    return ok;
 }
 
 uint32_t read_device_id()
@@ -184,7 +211,9 @@ bool init(const Config &config)
     s_info.device_id = device_id;
     if (!is_valid_device_id(s_info.device_id)) {
         s_info.state = State::Error;
-        UWB_LOGE(TAG, "DW3000 init failed to read device id, raw=0x%08lx", static_cast<unsigned long>(s_info.device_id));
+        UWB_LOGE(TAG,
+                 "DW3000 init failed to read device id, raw=0x%08lx",
+                 static_cast<unsigned long>(s_info.device_id));
         return false;
     }
 

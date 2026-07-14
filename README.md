@@ -61,3 +61,4 @@ Current pin mapping in the project:
 - Hardware and software reference repository: https://github.com/Makerfabs/Makerfabs-ESP32-UWB
 - `ESP32-WROOM-32` datasheet: [docs/esp32-wroom-32_datasheet_en.pdf](docs/esp32-wroom-32_datasheet_en.pdf)
 - `DW3110 / DW3000 family` reference page: https://www.qorvo.com/products/p/DW3110#overview
+- Product Data Sheet: https://www.qorvo.com/products/p/DW3110

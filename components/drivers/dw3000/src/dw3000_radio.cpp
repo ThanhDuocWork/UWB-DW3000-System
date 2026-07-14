@@ -21,7 +21,7 @@ bool wait_for_status(uint32_t expected_mask, uint32_t error_mask, uint32_t timeo
     uint32_t status = 0U;
 
     while ((dw3000_hal::now_us() - start_us) < timeout_us) {
-        if (!read_reg_u32(registers::SYS_STATUS, registers::NO_SUB_ADDRESS, &status)) {
+        if (!read_sys_status(&status)) {
             return false;
         }
 
@@ -67,14 +67,24 @@ bool transmit(const uint8_t *data, size_t size)
         return false;
     }
 
+    uint32_t tx_fctrl = 0U;
+    if (!read_reg_u32(registers::TX_FCTRL, registers::NO_SUB_ADDRESS, &tx_fctrl)) {
+        UWB_LOGE(TAG, "DW3000 TX failed to read frame control");
+        return false;
+    }
+
     const uint32_t tx_frame_length = static_cast<uint32_t>(size + registers::FCS_LEN);
-    const uint32_t tx_fctrl = tx_frame_length & registers::TX_FCTRL_TXFLEN_BIT_MASK;
+    tx_fctrl &= ~(registers::TX_FCTRL_TXB_OFFSET_BIT_MASK |
+                  registers::TX_FCTRL_TR_BIT_MASK |
+                  registers::TX_FCTRL_TXFLEN_BIT_MASK);
+    tx_fctrl |= tx_frame_length & registers::TX_FCTRL_TXFLEN_BIT_MASK;
+
     if (!write_reg_u32(registers::TX_FCTRL, 0U, tx_fctrl)) {
         UWB_LOGE(TAG, "DW3000 TX frame control write failed len=%u", static_cast<unsigned>(size));
         return false;
     }
 
-    (void)write_reg_u32(registers::SYS_STATUS, 0U, registers::SYS_STATUS_TXFRS_BIT_MASK);
+    (void)clear_sys_status(sys_status_tx_done_mask());
 
     if (!issue_command(registers::CMD_TX)) {
         UWB_LOGE(TAG, "DW3000 TX start command failed");
@@ -82,7 +92,8 @@ bool transmit(const uint8_t *data, size_t size)
     }
 
     uint32_t status = 0U;
-    if (!wait_for_status(registers::SYS_STATUS_TXFRS_BIT_MASK, 0U, kTxTimeoutUs, &status)) {
+    if (!wait_for_status(sys_status_tx_done_mask(), 0U, kTxTimeoutUs, &status)) {
+        log_sys_status("tx-timeout", status);
         UWB_LOGE(TAG,
                  "DW3000 TX timeout status=0x%08lx len=%u",
                  static_cast<unsigned long>(status),
@@ -90,7 +101,8 @@ bool transmit(const uint8_t *data, size_t size)
         return false;
     }
 
-    (void)write_reg_u32(registers::SYS_STATUS, 0U, registers::SYS_STATUS_TXFRS_BIT_MASK);
+    (void)clear_sys_status(sys_status_tx_done_mask());
+    log_sys_status("tx-done", status);
     UWB_LOGI(TAG,
              LOG_FLAG_TX,
              "DW3000 TX sent len=%u status=0x%08lx",
@@ -101,10 +113,7 @@ bool transmit(const uint8_t *data, size_t size)
 
 bool start_receive()
 {
-    (void)write_reg_u32(registers::SYS_STATUS,
-                        0U,
-                        registers::SYS_STATUS_RXFCG_BIT_MASK |
-                            registers::SYS_STATUS_ALL_RX_ERR);
+    (void)clear_sys_status(sys_status_rx_good_mask() | sys_status_rx_error_mask());
 
     if (!issue_command(registers::CMD_RX)) {
         UWB_LOGE(TAG, "DW3000 RX start command failed");
@@ -129,11 +138,12 @@ bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeo
     }
 
     uint32_t status = 0U;
-    const uint32_t expected_mask = registers::SYS_STATUS_RXFCG_BIT_MASK;
-    const uint32_t error_mask = registers::SYS_STATUS_ALL_RX_ERR;
+    const uint32_t expected_mask = sys_status_rx_good_mask();
+    const uint32_t error_mask = sys_status_rx_error_mask();
     if (!wait_for_status(expected_mask, error_mask, timeout_ms * 1000U, &status)) {
-        if ((status & error_mask) != 0U) {
-            (void)write_reg_u32(registers::SYS_STATUS, 0U, status & error_mask);
+        if (sys_status_has_rx_error(status)) {
+            log_sys_status("rx-error", status);
+            (void)clear_sys_status(status & error_mask);
             UWB_LOGE(TAG, "DW3000 RX error status=0x%08lx", static_cast<unsigned long>(status));
         }
         return false;
@@ -147,14 +157,14 @@ bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeo
 
     const size_t frame_len = static_cast<size_t>(rx_finfo & registers::RX_FINFO_RXFLEN_BIT_MASK);
     if (frame_len <= registers::FCS_LEN) {
-        (void)write_reg_u32(registers::SYS_STATUS, 0U, registers::SYS_STATUS_RXFCG_BIT_MASK);
+        (void)clear_sys_status(sys_status_rx_good_mask());
         UWB_LOGE(TAG, "DW3000 RX invalid frame length=%u", static_cast<unsigned>(frame_len));
         return false;
     }
 
     const size_t payload_len = frame_len - registers::FCS_LEN;
     if (payload_len > buffer_size) {
-        (void)write_reg_u32(registers::SYS_STATUS, 0U, registers::SYS_STATUS_RXFCG_BIT_MASK);
+        (void)clear_sys_status(sys_status_rx_good_mask());
         UWB_LOGE(TAG,
                  "DW3000 RX frame too large payload=%u buffer=%u",
                  static_cast<unsigned>(payload_len),
@@ -168,7 +178,8 @@ bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeo
     }
 
     *out_size = payload_len;
-    (void)write_reg_u32(registers::SYS_STATUS, 0U, registers::SYS_STATUS_RXFCG_BIT_MASK);
+    (void)clear_sys_status(sys_status_rx_good_mask());
+    log_sys_status("rx-good", status);
     UWB_LOGI(TAG,
              LOG_FLAG_RX,
              "DW3000 RX good frame len=%u status=0x%08lx",

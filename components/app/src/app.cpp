@@ -36,7 +36,8 @@ static void enable_bringup_logs()
                       dw3000::LOG_FLAG_INIT |
                           dw3000::LOG_FLAG_REG |
                           dw3000::LOG_FLAG_TX |
-                          dw3000::LOG_FLAG_RX);
+                          dw3000::LOG_FLAG_RX |
+                          dw3000::LOG_FLAG_DIAG);
     UWB_LOG_SET_FLAGS("uwb", uwb::LOG_FLAG_STARTUP);
     UWB_LOG_SET_FLAGS("ranging", ranging::LOG_FLAG_INIT);
     UWB_LOG_SET_FLAGS("anchor_role", roles::anchor::LOG_FLAG_RUN);

@@ -24,20 +24,13 @@ static void enable_bringup_logs()
 {
     UWB_LOG_SET_FLAGS(TAG, LOG_FLAG_START);
     UWB_LOG_SET_FLAGS("board", board::LOG_FLAG_INIT);
-    UWB_LOG_SET_FLAGS("base_spi", base::spi::LOG_FLAG_INIT | base::spi::LOG_FLAG_TRANSFER);
-    UWB_LOG_SET_FLAGS("base_gpio", base::gpio::LOG_FLAG_INIT | base::gpio::LOG_FLAG_CONFIG | base::gpio::LOG_FLAG_WRITE);
+    UWB_LOG_SET_FLAGS("base_spi", base::spi::LOG_FLAG_INIT);
+    UWB_LOG_SET_FLAGS("base_gpio", base::gpio::LOG_FLAG_INIT);
     UWB_LOG_SET_FLAGS("base_irq", base::irq::LOG_FLAG_INIT);
     UWB_LOG_SET_FLAGS("dw3000_hal",
                       dw3000_hal::LOG_FLAG_INIT_INTERFACE |
-                          dw3000_hal::LOG_FLAG_RESET |
-                          dw3000_hal::LOG_FLAG_SPI_READ |
-                          dw3000_hal::LOG_FLAG_SPI_WRITE);
-    UWB_LOG_SET_FLAGS("dw3000",
-                      dw3000::LOG_FLAG_INIT |
-                          dw3000::LOG_FLAG_REG |
-                          dw3000::LOG_FLAG_TX |
-                          dw3000::LOG_FLAG_RX |
-                          dw3000::LOG_FLAG_DIAG);
+                          dw3000_hal::LOG_FLAG_RESET);
+    UWB_LOG_SET_FLAGS("dw3000", dw3000::LOG_FLAG_INIT);
     UWB_LOG_SET_FLAGS("uwb", uwb::LOG_FLAG_STARTUP);
     UWB_LOG_SET_FLAGS("ranging", ranging::LOG_FLAG_INIT);
     UWB_LOG_SET_FLAGS("anchor_role", roles::anchor::LOG_FLAG_RUN);

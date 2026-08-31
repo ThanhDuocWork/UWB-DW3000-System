@@ -93,7 +93,6 @@ bool transmit(const uint8_t *data, size_t size)
 
     uint32_t status = 0U;
     if (!wait_for_status(sys_status_tx_done_mask(), 0U, kTxTimeoutUs, &status)) {
-        log_sys_status("tx-timeout", status);
         UWB_LOGE(TAG,
                  "DW3000 TX timeout status=0x%08lx len=%u",
                  static_cast<unsigned long>(status),
@@ -102,7 +101,6 @@ bool transmit(const uint8_t *data, size_t size)
     }
 
     (void)clear_sys_status(sys_status_tx_done_mask());
-    log_sys_status("tx-done", status);
     UWB_LOGI(TAG,
              LOG_FLAG_TX,
              "DW3000 TX sent len=%u status=0x%08lx",
@@ -113,14 +111,24 @@ bool transmit(const uint8_t *data, size_t size)
 
 bool start_receive()
 {
-    (void)clear_sys_status(sys_status_rx_good_mask() | sys_status_rx_error_mask());
+    const uint32_t rx_clear_mask =
+        registers::SYS_STATUS_RXPRD_BIT_MASK |
+        registers::SYS_STATUS_RXSFDD_BIT_MASK |
+        registers::SYS_STATUS_CIADONE_BIT_MASK |
+        registers::SYS_STATUS_RXPHD_BIT_MASK |
+        registers::SYS_STATUS_RXFR_BIT_MASK |
+        registers::SYS_STATUS_RXFCG_BIT_MASK |
+        registers::SYS_STATUS_ALL_RX_ERR;
+
+    (void)issue_command(registers::CMD_TXRXOFF);
+    dw3000_hal::delay_ms(1);
+    (void)clear_sys_status(sys_status_tx_done_mask() | rx_clear_mask);
 
     if (!issue_command(registers::CMD_RX)) {
         UWB_LOGE(TAG, "DW3000 RX start command failed");
         return false;
     }
 
-    UWB_LOGI(TAG, LOG_FLAG_RX, "DW3000 RX enabled");
     return true;
 }
 
@@ -142,9 +150,11 @@ bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeo
     const uint32_t error_mask = sys_status_rx_error_mask();
     if (!wait_for_status(expected_mask, error_mask, timeout_ms * 1000U, &status)) {
         if (sys_status_has_rx_error(status)) {
-            log_sys_status("rx-error", status);
             (void)clear_sys_status(status & error_mask);
+            (void)issue_command(registers::CMD_TXRXOFF);
             UWB_LOGE(TAG, "DW3000 RX error status=0x%08lx", static_cast<unsigned long>(status));
+        } else {
+            (void)issue_command(registers::CMD_TXRXOFF);
         }
         return false;
     }
@@ -179,7 +189,6 @@ bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeo
 
     *out_size = payload_len;
     (void)clear_sys_status(sys_status_rx_good_mask());
-    log_sys_status("rx-good", status);
     UWB_LOGI(TAG,
              LOG_FLAG_RX,
              "DW3000 RX good frame len=%u status=0x%08lx",

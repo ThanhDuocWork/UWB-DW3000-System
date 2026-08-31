@@ -13,6 +13,7 @@ struct Config {
     int sfd_type = 1;
     uint16_t sfd_timeout = 129;
     bool sts_enabled = false;
+    uint32_t tx_power = 0xfdfdfdfd;
 };
 
 }  // namespace dw3000

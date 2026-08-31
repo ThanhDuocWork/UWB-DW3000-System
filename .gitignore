@@ -1,5 +1,7 @@
 # ESP-IDF build output
 /build/
+/build_anchor/
+/build_tag/
 /sdkconfig
 /sdkconfig.old
 /sdkconfig.*.old

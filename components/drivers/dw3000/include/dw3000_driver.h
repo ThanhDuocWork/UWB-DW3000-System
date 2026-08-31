@@ -26,7 +26,6 @@ bool write_reg_u32(uint32_t reg, uint16_t offset, uint32_t value);
 bool read_sys_status(uint32_t *status);
 bool clear_sys_status(uint32_t mask);
 bool read_sys_state(uint32_t *state);
-void log_sys_status(const char *context, uint32_t status);
 bool sys_status_is_ready_after_boot(uint32_t status);
 bool sys_status_has_tx_done(uint32_t status);
 bool sys_status_has_rx_good(uint32_t status);

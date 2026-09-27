@@ -4,7 +4,8 @@ namespace uwb {
 
 size_t encode_frame(const Frame &frame, uint8_t *buffer, size_t buffer_size)
 {
-    if (buffer == nullptr || buffer_size < 5 || frame.payload_size > frame.payload.size()) {
+    if (buffer == nullptr || buffer_size < 5U + frame.payload_size ||
+        frame.payload_size > frame.payload.size()) {
         return 0;
     }
 
@@ -24,7 +25,8 @@ size_t encode_frame(const Frame &frame, uint8_t *buffer, size_t buffer_size)
 
 bool decode_frame(const uint8_t *buffer, size_t size, Frame &frame)
 {
-    if (buffer == nullptr || size < 5) {
+    if (buffer == nullptr || size < 5 || size > 5U + frame.payload.size() ||
+        buffer[0] > static_cast<uint8_t>(FrameType::Final)) {
         return false;
     }
 

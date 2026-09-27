@@ -137,6 +137,48 @@ bool read_reg_u16(uint32_t reg, uint16_t offset, uint16_t *value)
     return true;
 }
 
+uint64_t decode_time40(const uint8_t *raw)
+{
+    return (static_cast<uint64_t>(raw[0]) |
+            (static_cast<uint64_t>(raw[1]) << 8U) |
+            (static_cast<uint64_t>(raw[2]) << 16U) |
+            (static_cast<uint64_t>(raw[3]) << 24U) |
+            (static_cast<uint64_t>(raw[4]) << 32U)) &
+           registers::DW_TIME_40_BIT_MASK;
+}
+
+bool configure_system_config()
+{
+    uint32_t sys_cfg = 0U;
+    if (!read_reg_u32(registers::SYS_CFG, registers::NO_SUB_ADDRESS, &sys_cfg)) {
+        UWB_LOGE(TAG, "DW3000 failed to read SYS_CFG");
+        return false;
+    }
+
+    sys_cfg &= ~(registers::SYS_CFG_PHR_MODE_BIT_MASK |
+                 registers::SYS_CFG_PHR_6M8_BIT_MASK |
+                 registers::SYS_CFG_CP_SPC_BIT_MASK |
+                 registers::SYS_CFG_CP_SDC_BIT_MASK |
+                 registers::SYS_CFG_PDOA_MODE_BIT_MASK);
+
+    if (!write_reg_u32(registers::SYS_CFG, registers::NO_SUB_ADDRESS, sys_cfg)) {
+        UWB_LOGE(TAG, "DW3000 failed to write SYS_CFG");
+        return false;
+    }
+
+    if (!write_reg_u8(registers::STS_CFG0, registers::NO_SUB_ADDRESS, registers::STS_CFG0_STS_LEN_64)) {
+        UWB_LOGE(TAG, "DW3000 failed to write STS_CFG0");
+        return false;
+    }
+
+    if (!write_reg_u32(registers::DTUNE3, registers::NO_SUB_ADDRESS, registers::DTUNE3_PD_THRESH_DEFAULT)) {
+        UWB_LOGE(TAG, "DW3000 failed to write DTUNE3 PD threshold");
+        return false;
+    }
+
+    return true;
+}
+
 bool configure_radio(const Config &config)
 {
     const uint8_t encoded_data_rate = encode_data_rate(config.data_rate);
@@ -171,6 +213,10 @@ bool configure_radio(const Config &config)
 
     if (config.sfd_type < 0 || config.sfd_type > 3) {
         UWB_LOGE(TAG, "DW3000 invalid sfd_type=%d", config.sfd_type);
+        return false;
+    }
+
+    if (!configure_system_config()) {
         return false;
     }
 
@@ -265,22 +311,31 @@ bool configure_radio(const Config &config)
 
     uint32_t chan_ctrl_rb = 0U;
     uint32_t tx_fctrl_rb = 0U;
+    uint32_t sys_cfg_rb = 0U;
+    uint32_t dtune3_rb = 0U;
     uint16_t dtune0_rb = 0U;
     uint16_t sfd_timeout_rb = 0U;
     uint16_t pre_toc_rb = 0U;
+    uint8_t sts_cfg0_rb = 0U;
     uint8_t rx_sfd_holdoff_rb = 0U;
-    if (read_reg_u32(registers::CHAN_CTRL, registers::NO_SUB_ADDRESS, &chan_ctrl_rb) &&
+    if (read_reg_u32(registers::SYS_CFG, registers::NO_SUB_ADDRESS, &sys_cfg_rb) &&
+        read_reg_u32(registers::CHAN_CTRL, registers::NO_SUB_ADDRESS, &chan_ctrl_rb) &&
         read_reg_u32(registers::TX_FCTRL, registers::NO_SUB_ADDRESS, &tx_fctrl_rb) &&
         read_reg_u16(registers::DTUNE0, 0U, &dtune0_rb) &&
+        read_reg_u32(registers::DTUNE3, registers::NO_SUB_ADDRESS, &dtune3_rb) &&
+        read_reg_u8(registers::STS_CFG0, registers::NO_SUB_ADDRESS, &sts_cfg0_rb) &&
         read_reg_u16(registers::DTUNE0, 2U, &sfd_timeout_rb) &&
         read_reg_u16(registers::PRE_TOC, registers::NO_SUB_ADDRESS, &pre_toc_rb) &&
         read_reg_u8(registers::DTUNE4, registers::DTUNE4_RX_SFD_HLDOFF_OFFSET, &rx_sfd_holdoff_rb)) {
         UWB_LOGD(TAG,
                  LOG_FLAG_DIAG,
-                 "DW3000 radio readback CHAN_CTRL=0x%08lx TX_FCTRL=0x%08lx DTUNE0=0x%04x SFD_TO=%u PRE_TOC=%u DTUNE4_HLDOFF=0x%02x",
+                 "DW3000 radio readback SYS_CFG=0x%08lx CHAN_CTRL=0x%08lx TX_FCTRL=0x%08lx DTUNE0=0x%04x DTUNE3=0x%08lx STS_CFG0=0x%02x SFD_TO=%u PRE_TOC=%u DTUNE4_HLDOFF=0x%02x",
+                 static_cast<unsigned long>(sys_cfg_rb),
                  static_cast<unsigned long>(chan_ctrl_rb),
                  static_cast<unsigned long>(tx_fctrl_rb),
                  static_cast<unsigned>(dtune0_rb),
+                 static_cast<unsigned long>(dtune3_rb),
+                 static_cast<unsigned>(sts_cfg0_rb),
                  static_cast<unsigned>(sfd_timeout_rb),
                  static_cast<unsigned>(pre_toc_rb),
                  static_cast<unsigned>(rx_sfd_holdoff_rb));
@@ -315,6 +370,8 @@ bool configure_rx_tuning(const Config &config)
         return false;
     }
 
+    dgc_cfg &= static_cast<uint16_t>(~registers::DGC_CFG_THR_64_BIT_MASK);
+    dgc_cfg |= static_cast<uint16_t>(registers::DGC_CFG_THR_64_VALUE << registers::DGC_CFG_THR_64_BIT_OFFSET);
     dgc_cfg |= registers::DGC_CFG_RX_TUNE_EN_BIT_MASK;
     if (!write_reg_u16(registers::DGC_CFG, registers::NO_SUB_ADDRESS, dgc_cfg)) {
         UWB_LOGE(TAG,
@@ -777,6 +834,144 @@ uint32_t read_device_id()
     return device_id;
 }
 
+bool read_rx_timestamp(uint64_t *timestamp)
+{
+    if (timestamp == nullptr) {
+        UWB_LOGE(TAG, "DW3000 read_rx_timestamp null output");
+        return false;
+    }
+
+    uint8_t raw[registers::DW_TIME_LEN] = {};
+    if (!read_reg(registers::RX_TIME_0, registers::NO_SUB_ADDRESS, raw, sizeof(raw))) {
+        UWB_LOGE(TAG, "DW3000 failed to read RX timestamp");
+        return false;
+    }
+
+    *timestamp = decode_time40(raw);
+    UWB_LOGD(TAG,
+             LOG_FLAG_DIAG,
+             "DW3000 RX timestamp=0x%02lx%08lx",
+             static_cast<unsigned long>(*timestamp >> 32U),
+             static_cast<unsigned long>(*timestamp & 0xFFFFFFFFUL));
+    return true;
+}
+
+bool read_tx_timestamp(uint64_t *timestamp)
+{
+    if (timestamp == nullptr) {
+        UWB_LOGE(TAG, "DW3000 read_tx_timestamp null output");
+        return false;
+    }
+
+    uint8_t raw[registers::DW_TIME_LEN] = {};
+    if (!read_reg(registers::TX_TIME_LO, registers::NO_SUB_ADDRESS, raw, sizeof(raw))) {
+        UWB_LOGE(TAG, "DW3000 failed to read TX timestamp");
+        return false;
+    }
+
+    *timestamp = decode_time40(raw);
+    UWB_LOGD(TAG,
+             LOG_FLAG_DIAG,
+             "DW3000 TX timestamp=0x%02lx%08lx",
+             static_cast<unsigned long>(*timestamp >> 32U),
+             static_cast<unsigned long>(*timestamp & 0xFFFFFFFFUL));
+    return true;
+}
+
+bool predict_delayed_tx_timestamp(uint32_t time_high32, uint64_t *timestamp)
+{
+    if (timestamp == nullptr) {
+        return false;
+    }
+    uint8_t antenna_delay[2] = {};
+    if (!read_reg(registers::TX_ANTD, 0U, antenna_delay, sizeof(antenna_delay))) {
+        return false;
+    }
+    *timestamp =
+        ((static_cast<uint64_t>(time_high32 & registers::DX_TIME_BIT_MASK) << 8U) +
+         antenna_delay[0] + (static_cast<uint64_t>(antenna_delay[1]) << 8U)) &
+        registers::DW_TIME_40_BIT_MASK;
+    return true;
+}
+
+bool set_delayed_tx_time(uint32_t time_high32)
+{
+    const uint32_t dx_time = time_high32 & registers::DX_TIME_BIT_MASK;
+    if (!write_reg_u32(registers::DX_TIME, registers::NO_SUB_ADDRESS, dx_time)) {
+        UWB_LOGE(TAG,
+                 "DW3000 failed to set delayed TX time=0x%08lx",
+                 static_cast<unsigned long>(dx_time));
+        return false;
+    }
+
+    UWB_LOGD(TAG, LOG_FLAG_DIAG, "DW3000 delayed TX time=0x%08lx", static_cast<unsigned long>(dx_time));
+    return true;
+}
+
+bool set_rx_timeout(uint32_t timeout_uus)
+{
+    if ((timeout_uus & ~registers::RX_FWTO_BIT_MASK) != 0U) {
+        UWB_LOGE(TAG, "DW3000 RX timeout too large=%lu", static_cast<unsigned long>(timeout_uus));
+        return false;
+    }
+
+    uint32_t sys_cfg = 0U;
+    if (!read_reg_u32(registers::SYS_CFG, registers::NO_SUB_ADDRESS, &sys_cfg)) {
+        UWB_LOGE(TAG, "DW3000 failed to read SYS_CFG for RX timeout");
+        return false;
+    }
+
+    if (timeout_uus == 0U) {
+        sys_cfg &= ~registers::SYS_CFG_RXWTOE_BIT_MASK;
+    } else {
+        sys_cfg |= registers::SYS_CFG_RXWTOE_BIT_MASK;
+    }
+
+    if (!write_reg_u32(registers::RX_FWTO, registers::NO_SUB_ADDRESS, timeout_uus)) {
+        UWB_LOGE(TAG, "DW3000 failed to set RX timeout=%lu", static_cast<unsigned long>(timeout_uus));
+        return false;
+    }
+
+    if (!write_reg_u32(registers::SYS_CFG, registers::NO_SUB_ADDRESS, sys_cfg)) {
+        UWB_LOGE(TAG, "DW3000 failed to update SYS_CFG RXWTOE");
+        return false;
+    }
+
+    UWB_LOGD(TAG,
+             LOG_FLAG_DIAG,
+             "DW3000 RX timeout=%lu enabled=%d",
+             static_cast<unsigned long>(timeout_uus),
+             timeout_uus == 0U ? 0 : 1);
+    return true;
+}
+
+bool set_rx_after_tx_delay(uint32_t delay_uus)
+{
+    if ((delay_uus & ~registers::ACK_RESP_W4R_TIM_BIT_MASK) != 0U) {
+        UWB_LOGE(TAG, "DW3000 RX-after-TX delay too large=%lu", static_cast<unsigned long>(delay_uus));
+        return false;
+    }
+
+    uint32_t ack_resp = 0U;
+    if (!read_reg_u32(registers::ACK_RESP, registers::NO_SUB_ADDRESS, &ack_resp)) {
+        UWB_LOGE(TAG, "DW3000 failed to read ACK_RESP");
+        return false;
+    }
+
+    ack_resp &= ~registers::ACK_RESP_W4R_TIM_BIT_MASK;
+    ack_resp |= delay_uus & registers::ACK_RESP_W4R_TIM_BIT_MASK;
+
+    if (!write_reg_u32(registers::ACK_RESP, registers::NO_SUB_ADDRESS, ack_resp)) {
+        UWB_LOGE(TAG,
+                 "DW3000 failed to set RX-after-TX delay=%lu",
+                 static_cast<unsigned long>(delay_uus));
+        return false;
+    }
+
+    UWB_LOGD(TAG, LOG_FLAG_DIAG, "DW3000 RX-after-TX delay=%lu", static_cast<unsigned long>(delay_uus));
+    return true;
+}
+
 bool init(const Config &config)
 {
     if (!port_init()) {
@@ -880,6 +1075,24 @@ bool init(const Config &config)
         return false;
     }
 
+    const uint8_t tx_delay[] = {static_cast<uint8_t>(config.tx_antenna_delay),
+                               static_cast<uint8_t>(config.tx_antenna_delay >> 8U)};
+    const uint8_t rx_delay[] = {static_cast<uint8_t>(config.rx_antenna_delay),
+                               static_cast<uint8_t>(config.rx_antenna_delay >> 8U)};
+    uint8_t tx_check[2] = {}, rx_check[2] = {};
+    if (!write_reg(registers::TX_ANTD, 0U, tx_delay, sizeof(tx_delay)) ||
+        !write_reg(registers::CIA_CONF, 0U, rx_delay, sizeof(rx_delay)) ||
+        !read_reg(registers::TX_ANTD, 0U, tx_check, sizeof(tx_check)) ||
+        !read_reg(registers::CIA_CONF, 0U, rx_check, sizeof(rx_check)) ||
+        !std::equal(tx_delay, tx_delay + 2, tx_check) ||
+        !std::equal(rx_delay, rx_delay + 2, rx_check)) {
+        s_info.state = State::Error;
+        UWB_LOGE(TAG, "Antenna delay write/readback failed");
+        return false;
+    }
+    UWB_LOGI(TAG, LOG_FLAG_INIT, "Antenna delay tx=%u rx=%u (calibration required)",
+             static_cast<unsigned>(config.tx_antenna_delay),
+             static_cast<unsigned>(config.rx_antenna_delay));
     s_info.state = State::Ready;
     UWB_LOGI(TAG, LOG_FLAG_INIT, "DW3000 init devid=0x%08lx", static_cast<unsigned long>(s_info.device_id));
     return true;

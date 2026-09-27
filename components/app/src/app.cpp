@@ -1,4 +1,5 @@
 #include "app.h"
+#include "sdkconfig.h"
 
 #include "anchor_role.h"
 #include "app_config.h"
@@ -30,9 +31,10 @@ static void enable_bringup_logs()
     UWB_LOG_SET_FLAGS("dw3000_hal",
                       dw3000_hal::LOG_FLAG_INIT_INTERFACE |
                           dw3000_hal::LOG_FLAG_RESET);
-    UWB_LOG_SET_FLAGS("dw3000", dw3000::LOG_FLAG_INIT);
+    UWB_LOG_SET_FLAGS("dw3000", dw3000::LOG_FLAG_INIT |
+                                  dw3000::LOG_FLAG_TX | dw3000::LOG_FLAG_RX);
     UWB_LOG_SET_FLAGS("uwb", uwb::LOG_FLAG_STARTUP);
-    UWB_LOG_SET_FLAGS("ranging", ranging::LOG_FLAG_INIT);
+    UWB_LOG_SET_FLAGS("ranging", ranging::LOG_FLAG_INIT | ranging::LOG_FLAG_EXCHANGE);
     UWB_LOG_SET_FLAGS("anchor_role", roles::anchor::LOG_FLAG_RUN);
     UWB_LOG_SET_FLAGS("tag_role", roles::tag::LOG_FLAG_RUN);
 }
@@ -53,7 +55,12 @@ void start()
     uwb::log_startup();
     ranging::init();
 
-    if (!dw3000::init({})) {
+    dw3000::Config radio_config{};
+#ifdef CONFIG_UWB_TX_ANTENNA_DELAY
+    radio_config.tx_antenna_delay = CONFIG_UWB_TX_ANTENNA_DELAY;
+    radio_config.rx_antenna_delay = CONFIG_UWB_RX_ANTENNA_DELAY;
+#endif
+    if (!dw3000::init(radio_config)) {
         UWB_LOGE(TAG, "DW3000 bring-up failed, stop app start");
         return;
     }

@@ -16,4 +16,19 @@ config UWB_NODE_ID
     range 1 255
     default 1
 
+config UWB_PEER_ID
+    int "Anchor ID addressed by tag"
+    range 1 255
+    default 100
+
+config UWB_TX_ANTENNA_DELAY
+    int "TX antenna delay (device ticks; calibrate per board)"
+    range 0 65535
+    default 16385
+
+config UWB_RX_ANTENNA_DELAY
+    int "RX antenna delay (device ticks; calibrate per board)"
+    range 0 65535
+    default 16385
+
 endmenu

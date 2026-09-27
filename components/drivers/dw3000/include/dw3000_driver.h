@@ -35,8 +35,33 @@ uint32_t sys_status_rx_good_mask();
 uint32_t sys_status_rx_error_mask();
 bool issue_command(uint32_t command);
 uint32_t read_device_id();
-bool transmit(const uint8_t *data, size_t size);
+bool read_rx_timestamp(uint64_t *timestamp);
+bool read_tx_timestamp(uint64_t *timestamp);
+bool set_delayed_tx_time(uint32_t time_high32);
+// Same aligned/antenna-adjusted timestamp used by transmit() verification.
+bool predict_delayed_tx_timestamp(uint32_t time_high32, uint64_t *timestamp);
+bool set_rx_timeout(uint32_t timeout_uus);
+bool set_rx_after_tx_delay(uint32_t delay_uus);
+struct TxOptions {
+    // Absolute DX_TIME: bits 39:8 of the device clock; bit 0 is ignored.
+    // This blocking API times out 200 ms after issuing the TX command.
+    bool delayed = false;
+    uint32_t delayed_time_high32 = 0;
+    bool response_expected = false;
+    uint32_t rx_after_tx_uus = 0;
+    uint32_t rx_timeout_uus = 0;
+};
+
+// StartNow disables hardware RX timeout and uses the software timeout.
+// AfterTx consumes the existing W4R window, without restarting or clearing RX.
+enum class RxMode { StartNow, AfterTx };
+
+// Single radio owner/task only. Timestamp outputs are valid only on success,
+// in 40-bit DW3000 device ticks. RX waits for RXFCG and CIADONE.
+bool transmit(const uint8_t *data, size_t size,
+              const TxOptions &options = {}, uint64_t *tx_timestamp = nullptr);
 bool start_receive();
-bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeout_ms);
+bool receive(uint8_t *data, size_t buffer_size, size_t *out_size, uint32_t timeout_ms,
+             uint64_t *rx_timestamp = nullptr, RxMode mode = RxMode::StartNow);
 
 }  // namespace dw3000

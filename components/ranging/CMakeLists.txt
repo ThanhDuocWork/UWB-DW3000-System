@@ -5,7 +5,7 @@ idf_component_register(
         "src/ranging_session.cpp"
         "src/ranging_measurement.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES uwb utils
+    REQUIRES uwb utils dw3000
 )
 
 target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)

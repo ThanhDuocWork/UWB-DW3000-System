@@ -14,6 +14,9 @@ struct Config {
     uint16_t sfd_timeout = 129;
     bool sts_enabled = false;
     uint32_t tx_power = 0xfdfdfdfd;
+    // Initial estimates only; calibrate each physical board before claiming accuracy.
+    uint16_t tx_antenna_delay = 16385U;
+    uint16_t rx_antenna_delay = 16385U;
 };
 
 }  // namespace dw3000

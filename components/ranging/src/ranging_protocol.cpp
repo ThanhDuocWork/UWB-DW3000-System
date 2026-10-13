@@ -188,6 +188,14 @@ Measurement run_responder(Session &session, uint16_t local)
              static_cast<unsigned long long>(t.t2), static_cast<unsigned long long>(t.t3),
              static_cast<unsigned long long>(t.t6));
     const Measurement result = calculate_measurement(t);
+    // Use the same 40-bit wrap handling as calculate_measurement().
+    UWB_LOGI(TAG, LOG_FLAG_EXCHANGE,
+             "DS-TWR intervals seq=%u peer=%u Ra_dtu=%llu Rb_dtu=%llu Da_dtu=%llu Db_dtu=%llu",
+             static_cast<unsigned>(session.sequence), static_cast<unsigned>(session.peer),
+             static_cast<unsigned long long>((t.t4 - t.t1) & TIME_MASK),
+             static_cast<unsigned long long>((t.t6 - t.t3) & TIME_MASK),
+             static_cast<unsigned long long>((t.t5 - t.t4) & TIME_MASK),
+             static_cast<unsigned long long>((t.t3 - t.t2) & TIME_MASK));
     if (!result.valid) {
         UWB_LOGE(TAG, "RANGE rejected seq=%u tof_dtu=%.3f distance_m=%.3f",
                  static_cast<unsigned>(session.sequence), result.tof_dtu, result.distance_m);

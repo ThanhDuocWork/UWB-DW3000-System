@@ -14,8 +14,11 @@ bool boot_flow(Engine &core, VerifyPrimary verify)
     const auto status = core.load_status();
     if (status == Status::Blank) return verify(PrimaryVersion::A);
     if (status != Status::Valid) return false;
-    const auto initial = core.mode();
-    if (initial == Mode::Ready && !verify(PrimaryVersion::B)) return false;
+    auto initial = core.mode();
+    if (initial == Mode::Ready && !verify(PrimaryVersion::B)) {
+        if (!core.reject_ready()) return false;
+        initial = Mode::Reverse;
+    }
     if (!core.boot()) return false;
     const bool forward = initial == Mode::Forward || initial == Mode::Ready;
     const bool reverse = initial == Mode::Trial || initial == Mode::Reverse;

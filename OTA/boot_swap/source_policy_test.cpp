@@ -58,7 +58,8 @@ int main(int argc, char **argv) {
     ordered(confirm, "actual_layout_valid()", "core.confirm()");
     ordered(confirm, "running_is(\"B.1\")", "core.confirm()");
     ordered(confirm, "valid_image(PRIMARY_ADDRESS, \"B.1\")", "core.confirm()");
-    ordered(confirm, "core.mode() != boot_swap::BootCore::Mode::Trial", "core.confirm()");
+    ordered(confirm, "const auto mode = core.mode()", "if (!loaded || mode != boot_swap::BootCore::Mode::Trial)");
+    ordered(confirm, "if (!loaded || mode != boot_swap::BootCore::Mode::Trial)", "core.confirm()");
     const auto provision = app.substr(app.find("int provision_command"));
     ordered(provision, "actual_layout_valid()", "core.provision()");
     ordered(provision, "valid_image(PRIMARY_ADDRESS, \"A.1\")", "core.provision()");

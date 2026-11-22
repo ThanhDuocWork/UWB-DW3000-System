@@ -64,6 +64,7 @@ struct Fake {
     Status load_status() { return status; }
     Mode mode() const { return boots ? final : initial; }
     bool boot() { ++boots; return succeeds; }
+    bool reject_ready() { return false; }
 };
 static void policies() {
     for (auto status : {Status::Blank, Status::Corrupt, Status::IoError}) {
@@ -129,7 +130,38 @@ static void cuts(const Memory &start, bool reverse) {
     std::cout << (reverse ? "reverse" : "forward") << " recovery: " << total + 1
               << " byte-mutation cuts passed\n";
 }
-int main() {
+static void ready_bad_b_recovers_a() {
+    auto start = images();
+    Engine setup(start);
+    check(setup.provision() && setup.request_update());
+    auto full = start; full.reset(); Engine forward(full); check(forward.boot());
+    for (int point = 0; point < full.mutations; ++point) {
+        auto m = start; m.reset(point); Engine interrupted(m);
+        try { check(interrupted.boot()); } catch (const Cut &) {}
+        m.reset(); Engine probe(m); check(probe.load());
+        if (probe.mode() != Mode::Ready) continue;
+        check(primary(m, Version::B));
+        check(std::equal(start.bytes.begin(), start.bytes.begin() + 192, m.bytes.begin() + 192));
+        m.bytes[100] ^= 1;
+        for (bool damage_a : {false, true}) {
+            auto test = m;
+            if (damage_a) test.bytes[192 + 100] ^= 1;
+            for (int reset = 0; reset < 2; ++reset) {
+                Engine boot(test);
+                const bool allowed = boot_swap::boot_flow(boot, [&](Version v) {
+                    return primary(test, v);
+                });
+                if (allowed == damage_a || (!damage_a && !primary(test, Version::A)))
+                    throw std::runtime_error("Ready with invalid B: unexpected recovery outcome");
+                if (!damage_a) check(boot.load() && boot.mode() == Mode::Idle);
+            }
+        }
+        return;
+    }
+    throw std::runtime_error("no durable Ready checkpoint found");
+}
+int main() try {
+    ready_bad_b_recovers_a();
     policies(); journal_cases();
     auto m = images(); Engine core(m); check(core.provision());
     check(core.request_update()); cuts(m, false);
@@ -146,4 +178,8 @@ int main() {
     check(pending.mode() == Mode::Trial);
     check(run(bad) && primary(bad, Version::A));
     std::cout << "boot flow policy, journal, confirm and rollback tests passed\n";
+    return 0;
+} catch (const std::exception &e) {
+    std::cerr << e.what() << '\n';
+    return 1;
 }

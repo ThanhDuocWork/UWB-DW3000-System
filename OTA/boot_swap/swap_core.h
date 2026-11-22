@@ -90,6 +90,11 @@ public:
         return mode() == Mode::Idle;
     }
 
+    bool reject_ready()
+    {
+        return loaded_ && mode() == Mode::Ready && commit(Mode::Reverse, 0, 0);
+    }
+
     bool confirm()
     {
         return loaded_ && mode() == Mode::Trial && commit(Mode::Idle, 0, 0);

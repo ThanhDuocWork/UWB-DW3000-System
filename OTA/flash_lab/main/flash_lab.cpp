@@ -19,6 +19,8 @@ constexpr unsigned LAB_ADDRESS = 0x3f0000;
 using Engine = boot_swap::Core<SECTOR, SLOT_SECTORS>;
 const esp_partition_t *partition = nullptr;
 bool boot_ok = false;
+static bool scratch_pause_armed = false; // RAM only; every reset clears the test hook.
+static bool journal_pause_armed = false; // RAM only; never persisted.
 // Static buffers: do not consume the app_main or console task stack.
 std::array<uint8_t, SECTOR> check_buffer{};
 
@@ -55,8 +57,31 @@ public:
             if (!flash_result(esp_partition_write(partition, s * SECTOR + o + done,
                                                   bytes + done, chunk), "write")) return false;
             ESP_LOGI(TAG, "PROGRAM sector=%u offset=%u bytes=%u", s, o + done, chunk);
+            if (scratch_pause_armed && s == 2 * SLOT_SECTORS && o + done == 0 && chunk == 256) {
+                scratch_pause_armed = false;
+                ESP_LOGW(TAG, "TEST PAUSED: scratch partially written; cut power now");
+                ESP_LOGW(TAG, "sector=%u offset=0 written=256/4096; journal not advanced since request", s);
+                std::fflush(stdout);
+                // Console task is not TWDT-subscribed; yield so watched idle tasks can run.
+                // No more flash operations or console commands until physical reset/power cut.
+                for (;;) vTaskDelay(pdMS_TO_TICKS(100));
+            }
             pause();
             done += chunk;
+        }
+        if (journal_pause_armed && (s == 7 || s == 8) && o % 32 == 0 && size == 28) {
+            journal_pause_armed = false;
+            uint32_t seal = 0;
+            const bool seal_read = read(s, o + 28, &seal, sizeof(seal));
+            ESP_LOGW(TAG, "TEST PAUSED: journal body written before seal; cut power now");
+            if (seal_read)
+                ESP_LOGW(TAG, "sector=%u offset=%u written=28/32 seal=0x%08lx (expected 0xffffffff)",
+                         s, o, static_cast<unsigned long>(seal));
+            else
+                ESP_LOGE(TAG, "sector=%u seal readback failed; erased seal not verified", s);
+            std::fflush(stdout);
+            // Between body and seal writes, not inside a torn write.
+            for (;;) vTaskDelay(pdMS_TO_TICKS(100));
         }
         return true;
     }
@@ -165,6 +190,50 @@ int swap(int, char **)
     return reset(0, nullptr);
 }
 
+int swap_pause(int, char **)
+{
+    if (!boot_ok || !engine.load() || engine.mode() != Engine::Mode::Idle || !pair_valid()) {
+        ESP_LOGE(TAG, "Swap pause refused: need healthy Idle and complete A/B pair");
+        return 1;
+    }
+    boot_ok = false;
+    if (!engine.request_update()) return 1;
+    scratch_pause_armed = true;
+    // Lab-only exception: enter the pending swap directly, WITHOUT a preliminary reboot.
+    const bool result = engine.boot();
+    scratch_pause_armed = false;
+    ESP_LOGE(TAG, "swap_pause: engine.boot returned unexpectedly (%d); boot_ok remains false", result);
+    return 1;
+}
+
+int journal_pause(int argc, char **argv)
+{
+    if (argc != 2 || (std::strcmp(argv[1], "request") != 0 &&
+                      std::strcmp(argv[1], "checkpoint") != 0)) {
+        std::puts("Usage: journal_pause request|checkpoint");
+        return 1;
+    }
+    if (!boot_ok || !engine.load() || engine.mode() != Engine::Mode::Idle || !pair_valid()) {
+        ESP_LOGE(TAG, "Journal pause refused: need healthy Idle and complete A/B pair");
+        return 1;
+    }
+    boot_ok = false;
+    if (std::strcmp(argv[1], "request") == 0) {
+        journal_pause_armed = true;
+        const bool result = engine.request_update();
+        journal_pause_armed = false;
+        ESP_LOGE(TAG, "journal_pause: request returned unexpectedly (%d); boot_ok remains false", result);
+        return 1;
+    }
+    if (!engine.request_update()) return 1;
+    journal_pause_armed = true;
+    // Persist the request first, then enter the first checkpoint without rebooting.
+    const bool result = engine.boot();
+    journal_pause_armed = false;
+    ESP_LOGE(TAG, "journal_pause: boot returned unexpectedly (%d); boot_ok remains false", result);
+    return 1;
+}
+
 int confirm(int, char **)
 {
     if (!boot_ok || !engine.load() || engine.mode() != Engine::Mode::Trial || !pair_valid()) {
@@ -203,7 +272,8 @@ extern "C" void app_main()
     ESP_LOGI(TAG, "swap_lab address=0x%lx size=0x%lx reset_reason=%d",
              static_cast<unsigned long>(partition->address),
              static_cast<unsigned long>(partition->size), static_cast<int>(esp_reset_reason()));
-    // Called once per real reset. A second invocation would simulate another boot.
+    // Normally once per real reset; lab pause commands enter a new pending request
+    // directly for the lab hook. Never call again on Trial: that would roll back.
     boot_ok = engine.boot();
     if (boot_ok && !pair_valid()) {
         boot_ok = false;
@@ -222,6 +292,8 @@ extern "C" void app_main()
     register_command("status", "Read journal state and compare all dummy A/B bytes", status);
     register_command("seed", "seed ERASE: destroy lab data, create Primary=A Secondary=B", seed);
     register_command("swap", "Persist swap request and reset (Idle only)", swap);
+    register_command("swap_pause", "Swap without reboot; freeze after scratch 256/4096 for power cut", swap_pause);
+    register_command("journal_pause", "journal_pause request|checkpoint: freeze after journal body before seal", journal_pause);
     register_command("confirm", "Accept swapped dummy data (Trial only)", confirm);
     register_command("reset", "Restart; unconfirmed Trial reverts", reset);
     ESP_ERROR_CHECK(esp_console_start_repl(repl));

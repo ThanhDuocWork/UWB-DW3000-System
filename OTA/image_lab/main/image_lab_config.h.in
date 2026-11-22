@@ -1,0 +1,4 @@
+#pragma once
+
+#define SWAP_BOARD_ROLE "@SWAP_BOARD_ROLE@"
+#define SWAP_VARIANT "@SWAP_VARIANT@"

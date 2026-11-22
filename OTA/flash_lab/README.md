@@ -54,6 +54,8 @@ These are not bootable firmware images and do not test image authentication.
 | status | Read journal and compare dummy patterns (no writes) |
 | seed ERASE | Destroy ONLY lab contents; initialize primary A, secondary B |
 | swap | Require healthy Idle/A-B pair; persist request then restart |
+| swap_pause | Require healthy Idle/A-B pair; persist request, no reboot, freeze after scratch 256/4096 |
+| journal_pause request\|checkpoint | Require healthy Idle/A-B pair; freeze after journal body, before seal |
 | confirm | Require healthy Trial/A-B pair; accept current primary |
 | reset | Restart; Trial without confirm will swap back |
 
@@ -93,6 +95,64 @@ flash operation; repeat at varying times. USB power removal is a true power
 cut only if no other supply/debugger/GPIO connection is back-powering the board.
 The reset command/EN is a reset test, not the same as removing power.
 Do not cut power while serial flashing the bootloader/partition table.
+
+## Test 4: deterministic partial-scratch power cut
+
+1. From a healthy Idle A/B pair run `swap_pause` (use `seed ERASE` only to
+   prepare a new experiment, not to recover an interrupted one).
+2. The command persists the request and calls the engine directly: **no
+   preliminary reboot**. Wait for `TEST PAUSED: scratch partially written; cut power now`.
+3. Scratch sector 6 has only its first 256/4096 bytes programmed; its tail is
+   erased, both source slots are intact, and the journal has not advanced since
+   the request. The RAM-only flag is consumed before logging and clears on reset.
+4. The console is intentionally frozen in a yielding loop with no further flash
+   writes. `status`, `reset`, and other console commands cannot run. Physically
+   remove power (without back-power), then reconnect; EN tests reset only.
+5. **Do not seed after the cut.** Startup runs without the pause hook and should
+   recover to Trial with the pair swapped. Run `confirm` to retain it, or reset
+   without confirming to roll back to the original pair in Idle.
+
+This checkpoint is after a successful 256-byte write, not a torn-write test.
+The normal `swap` command is unchanged. The current console task is not task
+watchdog subscribed; yielding lets the watched idle tasks run. If that task is
+subscribed in a future configuration, revisit the loop rather than globally
+disabling the watchdog. Hardware runtime remains NOT TESTED until run on a board.
+
+## TC09: journal body before seal
+
+Use the existing healthy baseline: `status` must show Idle, primary=A,
+secondary=B, boot_ok=1. **No seed is needed.** Both A/B and B/A orientations
+are accepted; for B/A reverse the expected letters below.
+
+1. Run `journal_pause request`. The RAM-only flag is armed before requesting.
+2. Wait for `TEST PAUSED: journal body written before seal; cut power now`.
+   Expect sector=7 or 8, offset=0, written=28/32 and readback
+   `seal=0xffffffff`. A readback failure is not evidence of an erased seal.
+3. The flag is consumed and the console yields forever without further writes.
+   Physically remove power, including USB/debugger/GPIO backpower, then restore.
+   Do not seed. Expect **Idle A/B, boot_ok=1**: the unsealed request is ignored.
+4. From healthy Idle A/B run `journal_pause checkpoint`. This persists the
+   request first, then arms the hook and calls `engine.boot()` without reboot.
+   The pause is at the first checkpoint body after the full scratch copy.
+5. At the same marker, remove all power and restore without seeding. Expect
+   **Trial B/A, boot_ok=1**. Do not confirm; run `reset`, then expect
+   **Idle A/B, boot_ok=1**.
+
+The prior sealed journal remains intact; only the alternate journal's 28-byte
+body is written, with its seal still erased. This is **between writes, not a
+torn-write test**: the body write succeeded and the seal write has not started.
+The hook is lab-only and RAM-only; reset clears it. Unexpected command return
+disarms the hook and leaves boot_ok=false. The frozen console cannot accept
+`reset`; EN is a reset-only alternative, not a power-cut result. Monitor
+reconnection may cause extra resets: capture reset reasons and the first startup
+status, since an extra reset after Trial rolls back and can hide that state.
+The same console-task watchdog caveat as `swap_pause` applies.
+
+Host target `journal_pause_test` / CTest `boot_swap_journal_pause` models this
+boundary by throwing after the completed body. Eight cases cover both commands,
+both journal destinations via Idle baseline parity, and both pair orientations.
+Host results do not establish hardware PASS; firmware build, flash and board
+power-cut validation must be reported separately.
 
 ## Return to UWB
 

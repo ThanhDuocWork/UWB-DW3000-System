@@ -62,3 +62,4 @@ Current pin mapping in the project:
 - `ESP32-WROOM-32` datasheet: [docs/esp32-wroom-32_datasheet_en.pdf](docs/esp32-wroom-32_datasheet_en.pdf)
 - `DW3110 / DW3000 family` reference page: https://www.qorvo.com/products/p/DW3110#overview
 - Product Data Sheet: https://www.qorvo.com/products/p/DW3110
+- Partition Tables https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32/api-guides/partition-tables.html

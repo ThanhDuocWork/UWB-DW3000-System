@@ -25,7 +25,7 @@ static unsigned count(const std::string &s, const std::string &text) {
 }
 int main(int argc, char **argv) {
     check(argc == 2); const std::string root = argv[1];
-    const auto hook = read(root + "/image_lab/bootloader_components/swap_read_hook/swap_read_hook.cpp");
+    const auto hook = read(root + "/firmware_update/bootloader_components/boot_swap_hook/boot_swap_hook.cpp");
     has(hook, "#include \"bootloader_utility.h\"");
     has(hook, "if (!inspect()) {"); has(hook, "bootloader_reset();");
     has(hook, "alignas(boot_swap::BootCore) unsigned char core_storage");
@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
     has(hook, "commissioning A.1; provision required");
     has(hook, "boot policy PASS: %s");
     check(hook.find("verify_image(boot_swap::kLayout[4]") == std::string::npos);
-    const auto app = read(root + "/image_lab/main/image_lab.cpp");
+    const auto app = read(root + "/firmware_update/main/firmware_update.cpp");
     check(count(app, "static boot_swap::BootCore core(flash)") == 1);
     check(count(app, "static boot_swap::BootFlashAdapter flash(") == 1);
     has(app, "esp_image_verify(ESP_IMAGE_VERIFY_SILENT");
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     check(ops.find("rtc_wdt_disable") == std::string::npos);
     check(ops.find("wdt_hal_disable") == std::string::npos);
     check(ops.find("wdt_hal_init") == std::string::npos);
-    const auto component = read(root + "/image_lab/bootloader_components/swap_read_hook/CMakeLists.txt");
+    const auto component = read(root + "/firmware_update/bootloader_components/boot_swap_hook/CMakeLists.txt");
     has(component, "PRIV_REQUIRES bootloader_support esp_app_format spi_flash hal)");
     static_assert(sizeof(boot_swap::BootCore) + sizeof(boot_swap::BootFlashAdapter) < 0x2800,
                   "Keep core/adapter storage below 10 KiB; total target DRAM needs linker verification");

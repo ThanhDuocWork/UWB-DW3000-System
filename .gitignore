@@ -31,3 +31,5 @@ __pycache__/
 
 # Test / local artifacts
 /testing/
+/build_fw_*/
+/OTA/firmware_update/main/wifi_probe_local.h

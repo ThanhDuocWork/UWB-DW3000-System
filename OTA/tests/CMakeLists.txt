@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
-project(boot_swap_lab LANGUAGES CXX)
+project(boot_swap_tests LANGUAGES CXX)
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../boot_swap")
 enable_testing()
 add_executable(boot_swap_test swap_test.cpp)
 target_compile_features(boot_swap_test PRIVATE cxx_std_17)
